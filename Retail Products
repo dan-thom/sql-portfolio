@@ -1,0 +1,45 @@
+# In this project, I've created a sqlite database for a local maker store that holds information
+# about the store's products. First I created some tables to hold the data, then inserted data
+# into each table. Finally, I ran some analytics with joins and aggregation.
+
+
+# Creating the necessary tables
+CREATE TABLE categories (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR
+);
+
+CREATE TABLE products ( 
+    id INTEGER PRIMARY KEY , 
+    name VARCHAR , 
+    color VARCHAR , 
+    description TEXT , 
+    unit_price NUMERIC , 
+    category_id INTEGER,
+    CONSTRAINT fk_category
+        FOREIGN KEY (category_id)
+        REFERENCES categories(id)
+);
+
+# Inserting data into the tables (shortened for brevity)
+INSERT INTO categories VALUES (0, "Printer Filament");
+INSERT INTO products VALUES (0, "PLA+ 1kg", "Blue", "Our recycled PLA with strength-enhancers for additional durability...", 18.99, 0);
+
+# Analysis
+# Finding the average item price in each category
+SELECT
+    c.name AS "Category",
+    ROUND(AVG(p.unit_price), 2) AS "Avg. Price"
+FROM categories c
+LEFT JOIN products p
+    ON c.id = p.category_id
+GROUP BY c.id
+
+# Finding the number of products in each category
+SELECT
+    c.name AS "Category",
+    COUNT(p.id) AS "Num. of Products"
+FROM categories c
+LEFT JOIN products p
+    ON c.id = p.category_id
+GROUP BY c.id
