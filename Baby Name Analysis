@@ -1,0 +1,99 @@
+# This project explored trends in baby names in America over 101 years (1920 - 2020)
+# Data is from the Social Security Administration and the project was designed by DataCamp.
+# Names given to more than 5000 babies in a given year appear in the dataset.
+
+# 1 - Names that have stood the test of time
+# Find baby names that appear every year from 1920 to 2020, ordered by most to least popular overall
+SELECT first_name, SUM(num)
+FROM baby_names
+GROUP BY first_name
+HAVING COUNT(first_name) = 101
+ORDER BY SUM(num) DESC
+
+# 2 - Timeless or trendy?
+# Classify first names as 'Classic', 'Semi-classic', 'Semi-trendy', or 'Trendy' based on years appearing in dataset
+SELECT first_name, SUM(num),
+    CASE WHEN COUNT(first_name) > 80 THEN 'Classic'
+    WHEN COUNT(first_name) > 50 AND COUNT(first_name) <= 80 THEN 'Semi-classic'
+    WHEN COUNT(first_name) > 20 AND COUNT(first_name) <= 50 THEN 'Semi-trendy'
+    ELSE 'Trendy' END AS popularity_type
+FROM baby_names
+GROUP BY first_name
+ORDER BY first_name
+
+# 3 - Top female names since 1920
+# Rank only female names by the number of babies who have ever had that name and return the top ten
+SELECT
+    RANK() OVER (ORDER BY SUM(num) DESC) AS name_rank,
+    first_name,
+    SUM(num)
+FROM baby_names
+WHERE sex = 'F'
+GROUP BY first_name
+LIMIT 10
+
+# 4 - Picking a name for a friend
+# Your friend is searching for a female name, popular since 2015, that ends with the letter a
+SELECT first_name
+FROM baby_names
+WHERE sex = 'F' AND year > 2015 AND first_name LIKE '%a'
+GROUP BY first_name
+ORDER BY SUM(num) DESC
+
+# 5 - Olivia
+# The previous task revealed Olivia is the top name to fit your friend's criteria
+# Explore the rise of Olivia, counting cumulative Olivias since the name's first appearance in the dataset
+SELECT
+    year,
+    first_name,
+    num,
+    SUM(num) OVER (ORDER BY year) AS cumulative_olivias
+FROM baby_names
+WHERE first_name = 'Olivia'
+ORDER BY year
+
+# 6 - Subquery prep
+# Select the maximum number of males given the same name each year
+-- Select year and maximum number of babies given any one male name in that year, aliased as max_num
+-- Filter the data to include only results where sex equals 'M'
+SELECT year,
+    MAX(num) AS max_num
+FROM baby_names
+WHERE sex = 'M'
+GROUP BY year
+
+# 7 - Top male names over the years
+# Find the top male name for each year, using the previous query as a subquery
+SELECT q.year,
+    q.first_name,
+    q.num
+FROM baby_names AS q
+INNER JOIN (
+    SELECT year,
+        MAX(num) AS max_num
+    FROM baby_names
+    WHERE sex = 'M'
+    GROUP BY year) AS s
+ON q.year = s.year AND q.num = s.max_num
+ORDER BY year DESC
+
+# 8 - Most years at number 1
+# Take the previous query a step further, finding the names with the most years in the number 1 spot
+WITH cte AS (
+    SELECT q.year,
+        q.first_name,
+        q.num
+    FROM baby_names AS q
+    INNER JOIN (
+        SELECT year,
+            MAX(num) AS max_num
+        FROM baby_names
+        WHERE sex = 'M'
+        GROUP BY year) AS s
+    ON q.year = s.year AND q.num = s.max_num
+    ORDER BY year DESC)
+SELECT first_name,
+    COUNT(first_name) AS count_top_name
+FROM cte
+GROUP BY first_name
+ORDER BY count_top_name DESC
