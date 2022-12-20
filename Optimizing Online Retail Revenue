@@ -1,0 +1,129 @@
+# This project uses data from a ficticious online sportswear retailer to practice exploratory data analysis,
+# aggregation, cleaning and labeling, Common Table Expressions, and other SQL techniques.
+# The project and its dataset were provided by DataCamp.
+
+# 1 - Checking for missing values
+# Select the total number of products, as well as the number of non-missing values for description, listing_price, and last_visited
+SELECT
+    COUNT(*) AS total_rows,
+    COUNT(i.description) AS count_description,
+    COUNT(f.listing_price) AS count_listing_price,
+    COUNT(t.last_visited) AS count_last_visited
+FROM
+    info i
+JOIN finance f
+    USING(product_id)
+JOIN traffic t
+    USING(product_id)
+
+# 2 - Pricing by brand
+# Find the number of products of every price point and group by brand, ordered from highest to lowest price
+SELECT
+    b.brand,
+    f.listing_price::INTEGER,
+    COUNT(*)
+FROM finance f
+INNER JOIN brands b
+    USING(product_id)
+WHERE listing_price > 0
+GROUP BY brand, listing_price
+ORDER BY listing_price DESC
+
+# 3 - Categorizing by price
+# The last query returned 77 unique price points. Simplify by categorizing prices into 4 discrete brackets.
+# Then find the number of products & their associated revenue for each brand and price category.
+SELECT
+    b.brand,
+    COUNT(*),
+    SUM(f.revenue) AS total_revenue,
+    CASE
+        WHEN f.listing_price < 42 THEN 'Budget'
+        WHEN f.listing_price >= 42 AND f.listing_price < 74 THEN 'Average'
+        WHEN f.listing_price >= 74 AND f.listing_price < 129 THEN 'Expensive'
+        ELSE 'Elite'
+        END AS price_category
+FROM finance f
+INNER JOIN brands b
+    USING(product_id)
+WHERE b.brand IS NOT NULL
+GROUP BY brand, price_category
+
+# 4 - Average discount by brand
+# This retailer sells disproportionally more Adidas than Nike. Let's explore!
+# Find the average discount on products sold under each brand.
+SELECT
+    b.brand,
+    AVG(f.discount) * 100 AS average_discount
+FROM finance f
+INNER JOIN brands b
+    USING(product_id)
+WHERE b.brand IS NOT NULL
+GROUP BY brand
+ORDER BY total_revenue DESC
+
+# 5 - Revenue / review correlation
+# Check for a correlation betweent the number of reviews for a product and its revenue.
+SELECT CORR(r.reviews, f.revenue) AS review_revenue_corr
+FROM finance f
+JOIN reviews r
+    USING(product_id)
+
+# 6 - Ratings & reviews by description length
+# Could there be a correlation between the length of a products description and the ratings it receives?
+# Bin products by the length of the description (by hundreds of characters) and find the average rating for each bin.
+SELECT
+    TRUNC(LENGTH(i.description), -2) AS description_length,
+    ROUND(AVG(r.rating::NUMERIC), 2) AS average_rating
+FROM reviews r
+JOIN info i
+    USING(product_id)
+WHERE i.description IS NOT NULL
+GROUP BY description_length
+ORDER BY description_length
+
+# 7 - Reviews by month and brand
+# Does time of year affect the number of reviews left?
+# Group products by brand & month of last_visited, then count reviews for each group
+SELECT
+    b.brand,
+    DATE_PART('month', t.last_visited) AS month,
+    COUNT(*) AS num_reviews
+FROM reviews r
+JOIN traffic t
+    USING(product_id)
+JOIN brands b
+    USING(product_id)
+WHERE b.brand IS NOT NULL AND t.last_visited IS NOT NULL
+GROUP BY b.brand, month
+ORDER BY b.brand, month
+
+# 8 - Footwear performance
+# Let's look at just footwear products. How many of the store's products are footwear and how do they perform?
+# In lieu of a product type field, determine if a product is footwear by its description.
+# Create a CTE for reuse, then find the number of footwear products and their median revenue.
+WITH footwear AS
+(
+    SELECT i.description, f.revenue
+    FROM info i
+    JOIN finance f
+        USING(product_id)
+    WHERE description ILIKE '%shoe%'
+        OR description ILIKE '%trainer%'
+        OR description ILIKE '%foot%'
+        AND description IS NOT NULL
+)
+SELECT
+    COUNT(description) AS num_footwear_products,
+    PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY revenue) AS median_footwear_revenue
+FROM footwear;
+
+# 9 - Clothing product performance
+# Footwear makes up about 85% of the store's product line, but how do they perform against clothing items?
+# Reusing the footwear CTE, find the number of clothing (non-footwear) products and their median revenue.
+SELECT
+    COUNT(i.description) AS num_clothing_products,
+    PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY f.revenue) AS median_clothing_revenue
+FROM info i
+INNER JOIN finance f
+    USING(product_id)
+WHERE i.description NOT IN (SELECT description FROM footwear);
