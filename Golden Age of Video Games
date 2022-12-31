@@ -1,0 +1,92 @@
+# This project uses sales and review data for the 400 best selling video games from 1977 to 2020
+# to practice joins, set theory, filtering, grouping & ordering, and other SQL techniques.
+# The project questions were provided by DataCamp based on an abbreviated dataset from Kaggle.
+
+# 1 - Top 10 of all time
+# Select all columns to explore available attributes of the top 10 best selling games
+SELECT *
+FROM game_sales
+ORDER BY games_sold DESC
+LIMIT 10;
+
+# 2 - Check for missing review data
+# How many games in the dataset are missing review data?
+SELECT 
+    COUNT(CASE WHEN r.critic_score IS NULL AND r.user_score IS NULL THEN 1 END)
+FROM game_sales g
+LEFT JOIN reviews r
+    USING(game);
+
+# 3 - Top years from the critics' perspective
+# Find the top ten years based on average critic score, listed in descending order
+SELECT 
+    g.year,
+    ROUND(AVG(r.critic_score), 2) AS avg_critic_score
+FROM game_sales g
+INNER JOIN reviews r
+    USING(game)
+GROUP BY g.year
+ORDER BY avg_critic_score DESC
+LIMIT 10;
+
+# 4 - Refining the critic score query
+# Some of the rows returned by the previous query were suspiciously round. Could that be because very few games
+# were released that year? Refine the previous query to exclude years with less than 4 games in the dataset.
+SELECT 
+    g.year,
+    ROUND(AVG(r.critic_score), 2) AS avg_critic_score,
+    COUNT(g.game) AS num_games
+FROM game_sales g
+INNER JOIN reviews r
+    USING(game)
+GROUP BY g.year
+HAVING COUNT(g.game) > 4
+ORDER BY avg_critic_score DESC
+LIMIT 10;
+
+# 5 - What's the difference?
+# Which years were eliminated from the list when filtering for more than 4 games? Compare the two queries to find out.
+# Results of queries 3 and 4 were saved into tables top_critic_years and top_critic_years_more_than_four_games, respectively.
+SELECT year, avg_critic_score
+FROM top_critic_years
+EXCEPT
+SELECT year, avg_critic_score
+FROM top_critic_years_more_than_four_games
+ORDER BY avg_critic_score DESC;
+
+# 6 - Seeing things from the players' perspective
+# Find the top ten years for video games (where more than 4 games are in the dataset), based on average user reviews.
+SELECT
+    g.year,
+    ROUND(AVG(r.user_score), 2) AS avg_user_score,
+    COUNT(g.game) AS num_games
+FROM game_sales g
+INNER JOIN reviews r
+    USING(game)
+GROUP BY g.year
+HAVING COUNT(g.game) > 4
+ORDER BY avg_user_score DESC
+LIMIT 10;
+
+# 7 - Where do users and critics agree?
+# Compare the top years for critics and users to find any overlap.
+# Results of query 6 were save into table top_user_years_more_than_four_games
+SELECT year
+FROM top_critic_years_more_than_four_games
+INTERSECT
+SELECT year
+FROM top_user_years_more_than_four_games;
+
+# 8 - Show us the money!
+# Using the previous query as a subquery, find the total sales in millions of copies for each top year.
+SELECT 
+    year,
+    SUM(games_sold) AS total_games_sold
+FROM game_sales
+WHERE year IN (
+    SELECT year FROM top_critic_years_more_than_four_games
+    INTERSECT
+    SELECT year FROM top_user_years_more_than_four_games
+)
+GROUP BY year
+ORDER BY total_games_sold DESC;
